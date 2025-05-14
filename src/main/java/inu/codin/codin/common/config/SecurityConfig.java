@@ -32,7 +32,6 @@ import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.client.web.AuthorizationRequestRepository;
 import org.springframework.security.oauth2.client.web.HttpSessionOAuth2AuthorizationRequestRepository;
-import org.springframework.security.oauth2.client.web.OAuth2AuthorizationRequestResolver;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.endpoint.OAuth2AuthorizationRequest;
@@ -40,6 +39,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.LogoutFilter;
+import org.springframework.web.context.request.RequestContextListener;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -64,6 +64,8 @@ public class SecurityConfig {
     private final ClientRegistrationRepository clientRegistrationRepository;
     private final CustomOAuth2AccessTokenResponseClient customOAuth2AccessTokenResponseClient;
 
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+
     @Value("${server.domain}")
     private String BASEURL;
 
@@ -85,6 +87,10 @@ public class SecurityConfig {
                                 .requestMatchers(MANAGER_AUTH_PATHS).hasRole("MANAGER")
                                 .requestMatchers(USER_AUTH_PATHS).hasRole("USER")
                                 .anyRequest().hasRole("USER")
+                )
+                //Security 내부 인증 실패 처리 => access_token 없는 경우
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
                 )
                 //oauth2 로그인 설정 추가
                 .oauth2Login(oauth2 -> oauth2
@@ -151,6 +157,11 @@ public class SecurityConfig {
     }
 
     @Bean
+    public RequestContextListener requestContextListener() {
+        return new RequestContextListener();
+    }
+
+    @Bean
     public RoleHierarchy roleHierarchy() {
         return RoleHierarchyImpl.fromHierarchy("ROLE_ADMIN > ROLE_MANAGER > ROLE_USER");
     }
@@ -204,6 +215,10 @@ public class SecurityConfig {
     // Admin 권한 URL
     private static final String[] ADMIN_AUTH_PATHS = {
             "/v3/api/test4",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/v3/api-docs",
+            "/swagger-resources/**"
     };
 
     // Manager 권한 URL
